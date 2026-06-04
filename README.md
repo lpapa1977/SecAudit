@@ -82,7 +82,7 @@ La app **no está en Google Play** (se distribuye como APK). Es un *debug build*
 con la clave de depuración; perfecto para uso personal.
 
 ### Opción A — Instalar la APK en el teléfono (la más simple)
-1. Descargá el APK ya compilado: **[`dist/secaudit-1.1.apk`](dist/secaudit-1.1.apk)**
+1. Descargá el APK ya compilado: **[`dist/secaudit-1.0.apk`](dist/secaudit-1.0.apk)**
    (desde el teléfono, abrí el repo en el navegador → entrá al archivo → **Download**).
 2. Pasalo al teléfono si lo bajaste en la PC (cable USB, Google Drive, Telegram, etc.).
 3. En el teléfono, abrí el archivo con tu explorador → Android te va a pedir habilitar
@@ -119,7 +119,7 @@ No pide cámara, micrófono, contactos, SMS ni ubicación.
 
 ## 🧰 Detalles técnicos
 - **Lenguaje:** Kotlin · **UI:** programática (sin XML de layouts), tema oscuro propio.
-- **minSdk 21** · **targetSdk 34** · `applicationId = com.test.secaudit` · versión 1.1.
+- **minSdk 21** · **targetSdk 34** · `applicationId = com.test.secaudit` · versión 1.0.
 - **Dependencias:** solo `androidx.core` y `androidx.appcompat` (sin librerías de red).
 - **Sin internet:** la app no declara el permiso `INTERNET`.
 - Probado en **Motorola edge 30 fusion (Android 14)**.
