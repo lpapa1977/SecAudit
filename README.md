@@ -82,9 +82,9 @@ La app **no está en Google Play** (se distribuye como APK). Es un *debug build*
 con la clave de depuración; perfecto para uso personal.
 
 ### Opción A — Instalar la APK en el teléfono (la más simple)
-1. Conseguí el archivo **`app-debug.apk`** (compilalo, ver abajo, o descargalo de la
-   sección *Releases* del repo si hay una publicada).
-2. Pasalo al teléfono (cable USB, Google Drive, Telegram, etc.).
+1. Descargá el APK ya compilado: **[`dist/secaudit-1.1.apk`](dist/secaudit-1.1.apk)**
+   (desde el teléfono, abrí el repo en el navegador → entrá al archivo → **Download**).
+2. Pasalo al teléfono si lo bajaste en la PC (cable USB, Google Drive, Telegram, etc.).
 3. En el teléfono, abrí el archivo con tu explorador → Android te va a pedir habilitar
    **"Instalar apps desconocidas"** para esa app (navegador/archivos): permitilo.
 4. Tocá **Instalar**. Listo: aparece **SecAudit** en el cajón de apps.
