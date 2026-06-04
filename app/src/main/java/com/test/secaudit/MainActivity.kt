@@ -170,6 +170,10 @@ class MainActivity : AppCompatActivity() {
                 "Sistema", "Parche de seguridad", Sev.WARN,
                 "Parche: $patch (hace $days días). El dispositivo puede tener vulnerabilidades sin parchear; actualizá.",
                 fix = listOf(
+                    // El updater del OEM (Motorola) está protegido por permiso de firma y no
+                    // es lanzable; el de Google Play Services sí abre el chequeo de updates.
+                    Intent().setClassName("com.google.android.gms", "com.google.android.gms.update.SystemUpdateActivity"),
+                    Intent("android.settings.SYSTEM_UPDATE_SETTINGS").setPackage("com.google.android.gms"),
                     Intent("android.settings.SYSTEM_UPDATE_SETTINGS"),
                     Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
                 )
@@ -484,7 +488,7 @@ class MainActivity : AppCompatActivity() {
     /** Prueba cada intent candidato hasta que uno abra; si ninguno, abre Ajustes general. */
     private fun launchFix(candidates: List<Intent>) {
         for (i in candidates) {
-            try { startActivity(i); return } catch (_: Exception) { /* siguiente */ }
+            try { startActivity(i); return } catch (_: Exception) { /* probar el siguiente */ }
         }
         try { startActivity(Intent(Settings.ACTION_SETTINGS)) } catch (_: Exception) {}
     }

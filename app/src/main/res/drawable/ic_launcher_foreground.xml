@@ -4,25 +4,28 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Escudo -->
-    <path android:pathData="M54,22 L80,33 L80,55 C80,71.5 68.5,84.5 54,90 C39.5,84.5 28,71.5 28,55 L28,33 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="28" android:startY="22"
-                android:endX="80" android:endY="90">
-                <item android:offset="0" android:color="#FF34D399" />
-                <item android:offset="1" android:color="#FF059669" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- Brillo interno del escudo -->
-    <path android:pathData="M54,29 L74,37.5 L74,55 C74,68 65,78.5 54,83 Z"
-        android:fillColor="#22FFFFFF" />
-    <!-- Tilde de verificación -->
-    <path android:pathData="M43,55 L51,63 L67,46"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="6.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+    <!-- Escudo (escalado ~0.78 alrededor del centro para dejar más margen) -->
+    <group android:scaleX="0.78" android:scaleY="0.78" android:pivotX="54" android:pivotY="56">
+        <!-- Escudo -->
+        <path android:pathData="M54,22 L80,33 L80,55 C80,71.5 68.5,84.5 54,90 C39.5,84.5 28,71.5 28,55 L28,33 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="28" android:startY="22"
+                    android:endX="80" android:endY="90">
+                    <item android:offset="0" android:color="#FF34D399" />
+                    <item android:offset="1" android:color="#FF059669" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- Brillo interno del escudo -->
+        <path android:pathData="M54,29 L74,37.5 L74,55 C74,68 65,78.5 54,83 Z"
+            android:fillColor="#22FFFFFF" />
+        <!-- Tilde de verificación -->
+        <path android:pathData="M43,55 L51,63 L67,46"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="6.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
 </vector>
