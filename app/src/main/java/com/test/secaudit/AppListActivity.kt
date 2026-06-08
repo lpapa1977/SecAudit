@@ -16,8 +16,8 @@ import android.widget.TextView
 import java.util.concurrent.Executors
 
 /**
- * Pantalla dedicada: lista las apps marcadas como riesgosas (score >= 3) con sus motivos
- * y acciones para revisarlas/desinstalarlas. Escanea en segundo plano.
+ * Dedicated screen: lists apps flagged as risky (score >= 3) with their reasons
+ * and actions to review/uninstall them. Scans in background.
  */
 class AppListActivity : BaseSecActivity() {
 
@@ -34,13 +34,13 @@ class AppListActivity : BaseSecActivity() {
         setContentView(ScrollView(this).apply { isFillViewport = true; addView(container) })
 
         container.addView(TextView(this).apply {
-            text = "Apps marcadas"
+            text = "Flagged Apps"
             textSize = 24f
             setTextColor(col(R.color.textPrimary))
             setTypeface(typeface, Typeface.BOLD)
         })
         val loading = TextView(this).apply {
-            text = "Analizando aplicaciones…"
+            text = "Analyzing apps…"
             textSize = 14f
             setTextColor(col(R.color.textSecondary))
             setPadding(0, px(16), 0, 0)
@@ -60,10 +60,10 @@ class AppListActivity : BaseSecActivity() {
     private fun render(result: ScanResult) {
         container.addView(TextView(this).apply {
             text = if (result.flagged.isEmpty())
-                "No se detectaron apps sospechosas entre ${result.totalUserApps} apps de usuario."
+                "No suspicious apps detected among ${result.totalUserApps} user apps."
             else
-                "${result.flagged.size} de ${result.totalUserApps} apps de usuario marcadas. " +
-                    "Revisá cada una; el riesgo es orientativo, no una certeza de malware."
+                "${result.flagged.size} of ${result.totalUserApps} user apps flagged. " +
+                    "Review each one; the risk score is a hint, not a malware verdict."
             textSize = 13f
             setTextColor(col(R.color.textSecondary))
             setPadding(0, px(6), 0, px(8))
@@ -95,7 +95,7 @@ class AppListActivity : BaseSecActivity() {
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             addView(TextView(this@AppListActivity).apply {
-                text = if (app.high) "ALTO" else "MEDIO"
+                text = if (app.high) "HIGH" else "MEDIUM"
                 textSize = 11f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(accent)
@@ -125,8 +125,8 @@ class AppListActivity : BaseSecActivity() {
         card.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(0, px(10), 0, 0)
-            addView(makeButton("Ver app", filled = false) { openAppInfo(app.pkg) })
-            addView(makeButton("Desinstalar", filled = false) { uninstall(app.pkg) },
+            addView(makeButton("App info", filled = false) { openAppInfo(app.pkg) })
+            addView(makeButton("Uninstall", filled = false) { uninstall(app.pkg) },
                 LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = px(10) })
         })
         return card

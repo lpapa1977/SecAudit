@@ -32,10 +32,9 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * Auditor de seguridad del dispositivo: chequeos de Sistema/Desarrollador/Conectividad/
- * Privacidad (síncronos) + análisis del parque de aplicaciones (asíncrono) buscando apps
- * ocultas o sospechosas con criterio compuesto. Calcula un puntaje 0-100, ofrece botones
- * "Solucionar" hacia Ajustes y exporta un informe HTML.
+ * Device security auditor: System/Developer/Connectivity/Privacy checks (synchronous) +
+ * app fleet analysis (async) scanning for hidden or suspicious apps using composite criteria.
+ * Computes a 0-100 score, offers "Fix" buttons to Settings, and exports an HTML report.
  */
 class MainActivity : BaseSecActivity() {
 
@@ -65,11 +64,11 @@ class MainActivity : BaseSecActivity() {
         allChecks.addAll(runDeviceChecks())
         setContentView(buildBaseUi())
 
-        // Sección de apps: header + placeholder, y escaneo en segundo plano.
-        contentRoot.addView(categoryHeader("Aplicaciones"))
-        lastRenderedCategory = "Aplicaciones"
+        // Apps section: header + placeholder, async scan in background.
+        contentRoot.addView(categoryHeader("Apps"))
+        lastRenderedCategory = "Apps"
         val loading = TextView(this).apply {
-            text = "Analizando aplicaciones…"
+            text = "Analyzing apps…"
             textSize = 13f
             setTextColor(col(R.color.textSecondary))
             setPadding(px(4), px(2), 0, px(4))
@@ -103,7 +102,7 @@ class MainActivity : BaseSecActivity() {
         checkUserCaCerts(), checkLockScreenNotifications()
     )
 
-    // =========================================================== Sistema
+    // =========================================================== System
 
     private fun checkRoot(): Check {
         val suPaths = listOf(
@@ -125,10 +124,10 @@ class MainActivity : BaseSecActivity() {
 
         val rooted = foundBinary || foundManager || canExecSu
         return Check(
-            "Sistema", "Root",
+            "System", "Root",
             if (rooted) Sev.WARN else Sev.GOOD,
-            if (rooted) "Se detectaron indicadores de root. El modelo de seguridad de Android está comprometido."
-            else "No se detectaron indicadores de root."
+            if (rooted) "Root indicators detected. Android's security model is compromised."
+            else "No root indicators detected."
         )
     }
 
@@ -137,15 +136,14 @@ class MainActivity : BaseSecActivity() {
         val read = runCatching { enforce.readText().trim() }
         if (read.isSuccess) {
             return when (read.getOrNull()) {
-                "1" -> Check("Sistema", "SELinux", Sev.GOOD, "SELinux en modo ENFORCING.")
-                "0" -> Check("Sistema", "SELinux", Sev.WARN, "SELinux en modo PERMISSIVE.")
-                else -> Check("Sistema", "SELinux", Sev.GOOD, "SELinux activo (estado no concluyente).")
+                "1" -> Check("System", "SELinux", Sev.GOOD, "SELinux in ENFORCING mode.")
+                "0" -> Check("System", "SELinux", Sev.WARN, "SELinux in PERMISSIVE mode.")
+                else -> Check("System", "SELinux", Sev.GOOD, "SELinux active (inconclusive state).")
             }
         }
         return Check(
-            "Sistema", "SELinux", Sev.GOOD,
-            "SELinux en modo ENFORCING (la política bloquea la lectura del estado a las apps; " +
-                "en permissive no se bloquearía)."
+            "System", "SELinux", Sev.GOOD,
+            "SELinux in ENFORCING mode (policy blocks apps from reading its state; in permissive mode it wouldn't)."
         )
     }
 
@@ -156,10 +154,10 @@ class MainActivity : BaseSecActivity() {
             (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N &&
                 status == DevicePolicyManager.ENCRYPTION_STATUS_ACTIVE_PER_USER)
         return Check(
-            "Sistema", "Cifrado de almacenamiento",
+            "System", "Storage encryption",
             if (encrypted) Sev.GOOD else Sev.WARN,
-            if (encrypted) "El almacenamiento está cifrado. Protege tus datos ante acceso físico."
-            else "El almacenamiento NO está cifrado o no se pudo determinar.",
+            if (encrypted) "Storage is encrypted. Protects your data from physical access."
+            else "Storage is NOT encrypted or could not be determined.",
             fix = listOf(Intent(Settings.ACTION_SECURITY_SETTINGS))
         )
     }
@@ -168,10 +166,10 @@ class MainActivity : BaseSecActivity() {
         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
         val secure = km.isDeviceSecure
         return Check(
-            "Sistema", "Bloqueo de pantalla",
+            "System", "Screen lock",
             if (secure) Sev.GOOD else Sev.WARN,
-            if (secure) "Hay PIN, patrón o contraseña configurados."
-            else "Sin bloqueo seguro: cualquiera con el equipo accede a tus datos.",
+            if (secure) "PIN, pattern or password is configured."
+            else "No secure lock: anyone with the device can access your data.",
             fix = listOf(
                 Intent(DevicePolicyManager.ACTION_SET_NEW_PASSWORD),
                 Intent(Settings.ACTION_SECURITY_SETTINGS)
@@ -181,7 +179,7 @@ class MainActivity : BaseSecActivity() {
 
     private fun checkSecurityPatch(): Check {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return Check("Sistema", "Parche de seguridad", Sev.INFO, "No disponible en esta versión.")
+            return Check("System", "Security patch", Sev.INFO, "Not available on this version.")
         }
         val patch = Build.VERSION.SECURITY_PATCH
         val days = try {
@@ -191,13 +189,11 @@ class MainActivity : BaseSecActivity() {
         } catch (_: Exception) { -1L }
 
         return when {
-            days < 0 -> Check("Sistema", "Parche de seguridad", Sev.INFO, "Parche: $patch")
+            days < 0 -> Check("System", "Security patch", Sev.INFO, "Patch: $patch")
             days > 180 -> Check(
-                "Sistema", "Parche de seguridad", Sev.WARN,
-                "Parche: $patch (hace $days días). El dispositivo puede tener vulnerabilidades sin parchear; actualizá.",
+                "System", "Security patch", Sev.WARN,
+                "Patch: $patch ($days days ago). Device may have unpatched vulnerabilities; update it.",
                 fix = listOf(
-                    // El updater del OEM (Motorola) está protegido por permiso de firma y no es
-                    // lanzable; el de Google Play Services sí abre el chequeo de updates.
                     Intent().setClassName("com.google.android.gms", "com.google.android.gms.update.SystemUpdateActivity"),
                     Intent("android.settings.SYSTEM_UPDATE_SETTINGS").setPackage("com.google.android.gms"),
                     Intent("android.settings.SYSTEM_UPDATE_SETTINGS"),
@@ -205,8 +201,8 @@ class MainActivity : BaseSecActivity() {
                 )
             )
             else -> Check(
-                "Sistema", "Parche de seguridad", Sev.GOOD,
-                "Parche: $patch (hace $days días). Razonablemente al día."
+                "System", "Security patch", Sev.GOOD,
+                "Patch: $patch ($days days ago). Reasonably up to date."
             )
         }
     }
@@ -215,20 +211,20 @@ class MainActivity : BaseSecActivity() {
         val tags = Build.TAGS ?: ""
         val official = tags.contains("release-keys") && !tags.contains("test-keys")
         return Check(
-            "Sistema", "Firmware oficial",
+            "System", "Official firmware",
             if (official) Sev.GOOD else Sev.WARN,
-            if (official) "Build firmado con release-keys (firmware oficial)."
-            else "Build tags: $tags. Posible ROM custom o firmware no oficial; los parches pueden estar desactualizados."
+            if (official) "Build signed with release-keys (official firmware)."
+            else "Build tags: $tags. Possible custom ROM or unofficial firmware; patches may be outdated."
         )
     }
 
     private fun checkPlayProtect(): Check {
         val gms = try { packageManager.getPackageInfo("com.google.android.gms", 0); true } catch (_: Exception) { false }
         return Check(
-            "Sistema", "Google Play Protect",
+            "System", "Google Play Protect",
             if (gms) Sev.GOOD else Sev.INFO,
-            if (gms) "Google Play Services detectado. Play Protect puede analizar apps. Verificá que esté activo en Play Store."
-            else "Sin Google Play Services. Considerá un antivirus si instalás apps de fuera de la tienda."
+            if (gms) "Google Play Services detected. Play Protect can scan apps. Verify it is active in Play Store."
+            else "No Google Play Services. Consider antivirus if you install apps from outside the store."
         )
     }
 
@@ -237,27 +233,27 @@ class MainActivity : BaseSecActivity() {
         if (v == -1) v = Settings.Secure.getInt(contentResolver, "package_verifier_enable", 1)
         val enabled = v != 0
         return Check(
-            "Sistema", "Verificador de apps",
+            "System", "App verifier",
             if (enabled) Sev.GOOD else Sev.WARN,
-            if (enabled) "El verificador de Google (Play Protect) escanea apps al instalarlas."
-            else "El verificador de apps está desactivado: las apps no se escanean al instalar.",
+            if (enabled) "Google's verifier (Play Protect) scans apps when installed."
+            else "App verifier is disabled: apps are not scanned on install.",
             fix = if (enabled) emptyList() else listOf(Intent(Settings.ACTION_SECURITY_SETTINGS))
         )
     }
 
     private fun infoAndroidVersion(): Check = Check(
-        "Sistema", "Versión de Android", Sev.INFO,
+        "System", "Android version", Sev.INFO,
         "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}"
     )
 
-    // ====================================================== Desarrollador
+    // ====================================================== Developer
 
     private fun checkDeveloperOptions(): Check {
         val on = Settings.Global.getInt(contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
         return Check(
-            "Desarrollador", "Opciones de desarrollador",
+            "Developer", "Developer options",
             if (on) Sev.WARN else Sev.GOOD,
-            if (on) "Activadas. Si no sos desarrollador, desactivalas en Ajustes." else "Desactivadas.",
+            if (on) "Enabled. If you are not a developer, disable them in Settings." else "Disabled.",
             fix = listOf(
                 Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS),
                 Intent(Settings.ACTION_DEVICE_INFO_SETTINGS)
@@ -268,9 +264,9 @@ class MainActivity : BaseSecActivity() {
     private fun checkUsbDebugging(): Check {
         val on = Settings.Global.getInt(contentResolver, Settings.Global.ADB_ENABLED, 0) == 1
         return Check(
-            "Desarrollador", "USB Debugging (ADB)",
+            "Developer", "USB Debugging (ADB)",
             if (on) Sev.WARN else Sev.GOOD,
-            if (on) "USB debugging ACTIVADO. Desactivalo si no lo necesitás." else "USB debugging desactivado.",
+            if (on) "USB debugging ON. Disable if you don't need it." else "USB debugging off.",
             fix = listOf(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
         )
     }
@@ -278,10 +274,10 @@ class MainActivity : BaseSecActivity() {
     private fun checkAdbWifi(): Check {
         val on = Settings.Global.getInt(contentResolver, "adb_wifi_enabled", 0) == 1
         return Check(
-            "Desarrollador", "ADB por WiFi",
+            "Developer", "ADB over WiFi",
             if (on) Sev.WARN else Sev.GOOD,
-            if (on) "Depuración inalámbrica activada: el dispositivo es accesible por ADB en la red local."
-            else "Depuración inalámbrica desactivada.",
+            if (on) "Wireless debugging active: device is reachable via ADB on the local network."
+            else "Wireless debugging off.",
             fix = if (on) listOf(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) else emptyList()
         )
     }
@@ -289,10 +285,10 @@ class MainActivity : BaseSecActivity() {
     private fun checkAdbBackup(): Check {
         val allow = (applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP) != 0
         return Check(
-            "Desarrollador", "Backup ADB",
+            "Developer", "ADB Backup",
             if (allow) Sev.WARN else Sev.GOOD,
-            if (allow) "Backup ADB habilitado: los datos de esta app pueden extraerse por USB."
-            else "Backup ADB desactivado."
+            if (allow) "ADB backup enabled: this app's data can be extracted over USB."
+            else "ADB backup disabled."
         )
     }
 
@@ -302,15 +298,15 @@ class MainActivity : BaseSecActivity() {
                 packageManager.canRequestPackageInstalls()
             } catch (_: Exception) {
                 return Check(
-                    "Desarrollador", "Fuentes desconocidas", Sev.INFO,
-                    "No se pudo determinar (modelo por-app de Android 8+). Revisá en Ajustes › Apps con acceso especial."
+                    "Developer", "Unknown sources", Sev.INFO,
+                    "Could not determine (per-app model on Android 8+). Check Settings › Special app access."
                 )
             }
             Check(
-                "Desarrollador", "Fuentes desconocidas",
+                "Developer", "Unknown sources",
                 if (can) Sev.WARN else Sev.GOOD,
-                if (can) "Esta app puede instalar APKs externas (modelo por-app de Android 8+)."
-                else "Instalación de APKs externas restringida para esta app.",
+                if (can) "This app can install external APKs (per-app model on Android 8+)."
+                else "External APK installation restricted for this app.",
                 fix = listOf(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
                     Intent(Settings.ACTION_SECURITY_SETTINGS)
@@ -320,44 +316,44 @@ class MainActivity : BaseSecActivity() {
             @Suppress("DEPRECATION")
             val on = Settings.Secure.getInt(contentResolver, Settings.Secure.INSTALL_NON_MARKET_APPS, 0) == 1
             Check(
-                "Desarrollador", "Fuentes desconocidas",
+                "Developer", "Unknown sources",
                 if (on) Sev.WARN else Sev.GOOD,
-                if (on) "Permitida la instalación de apps de fuentes desconocidas." else "Solo apps de la tienda oficial."
+                if (on) "Installation of apps from unknown sources is allowed." else "Only apps from the official store."
             )
         }
     }
 
-    // ======================================================= Conectividad
+    // ======================================================= Connectivity
 
     private fun checkWifi(): Check {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val caps = cm.getNetworkCapabilities(cm.activeNetwork)
         val onWifi = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
         return Check(
-            "Conectividad", "Red WiFi", Sev.INFO,
-            if (onWifi) "Conectado por WiFi. Evitá redes públicas para datos sensibles."
-            else "Sin conexión WiFi activa."
+            "Connectivity", "WiFi", Sev.INFO,
+            if (onWifi) "Connected via WiFi. Avoid public networks for sensitive data."
+            else "No active WiFi connection."
         )
     }
 
     private fun checkBluetooth(): Check {
         val on = Settings.Global.getInt(contentResolver, "bluetooth_on", 0) == 1
         return Check(
-            "Conectividad", "Bluetooth", Sev.INFO,
-            if (on) "Bluetooth activado. Desactivalo si no lo usás." else "Bluetooth desactivado."
+            "Connectivity", "Bluetooth", Sev.INFO,
+            if (on) "Bluetooth on. Turn it off when not in use." else "Bluetooth off."
         )
     }
 
     private fun checkNfc(): Check {
         val adapter = NfcAdapter.getDefaultAdapter(this)
         return when {
-            adapter == null -> Check("Conectividad", "NFC", Sev.INFO, "Sin hardware NFC.")
-            adapter.isEnabled -> Check("Conectividad", "NFC", Sev.INFO, "NFC activado.")
-            else -> Check("Conectividad", "NFC", Sev.INFO, "NFC desactivado.")
+            adapter == null -> Check("Connectivity", "NFC", Sev.INFO, "No NFC hardware.")
+            adapter.isEnabled -> Check("Connectivity", "NFC", Sev.INFO, "NFC on.")
+            else -> Check("Connectivity", "NFC", Sev.INFO, "NFC off.")
         }
     }
 
-    // ========================================================= Privacidad
+    // ========================================================= Privacy
 
     private fun checkUserCaCerts(): Check {
         val userAliases = try {
@@ -366,12 +362,12 @@ class MainActivity : BaseSecActivity() {
             Collections.list(ks.aliases()).filter { it.startsWith("user:") }
         } catch (_: Exception) { emptyList() }
         return if (userAliases.isEmpty())
-            Check("Privacidad", "Certificados CA de usuario", Sev.GOOD,
-                "Sin certificados raíz agregados por el usuario. El tráfico TLS no es interceptable por CAs externas.")
+            Check("Privacy", "User CA certificates", Sev.GOOD,
+                "No root certificates added by the user. TLS traffic cannot be intercepted by external CAs.")
         else
-            Check("Privacidad", "Certificados CA de usuario", Sev.WARN,
-                "${userAliases.size} certificado(s) raíz agregados por el usuario o una empresa. " +
-                    "Pueden permitir interceptar tráfico HTTPS (MITM). Revisalos si no los reconocés.",
+            Check("Privacy", "User CA certificates", Sev.WARN,
+                "${userAliases.size} root certificate(s) added by user or organization. " +
+                    "May allow HTTPS traffic interception (MITM). Review them if you don't recognize them.",
                 fix = listOf(Intent(Settings.ACTION_SECURITY_SETTINGS)))
     }
 
@@ -383,69 +379,69 @@ class MainActivity : BaseSecActivity() {
             Intent(Settings.ACTION_SETTINGS)
         )
         return when {
-            show == 0 -> Check("Privacidad", "Notif. en pantalla bloqueada", Sev.GOOD,
-                "Las notificaciones no se muestran con el teléfono bloqueado.")
-            priv == 1 -> Check("Privacidad", "Notif. en pantalla bloqueada", Sev.WARN,
-                "El contenido de las notificaciones (incluidos códigos 2FA) es visible con el teléfono bloqueado.",
+            show == 0 -> Check("Privacy", "Lock screen notifications", Sev.GOOD,
+                "Notifications are not shown when the phone is locked.")
+            priv == 1 -> Check("Privacy", "Lock screen notifications", Sev.WARN,
+                "Notification content (including 2FA codes) is visible on the lock screen.",
                 fix = notifFix)
-            else -> Check("Privacidad", "Notif. en pantalla bloqueada", Sev.GOOD,
-                "Se muestran notificaciones pero con el contenido sensible oculto en el bloqueo.")
+            else -> Check("Privacy", "Lock screen notifications", Sev.GOOD,
+                "Notifications shown but sensitive content is hidden on lock screen.")
         }
     }
 
-    // ====================================================== Resumen apps
+    // ====================================================== App summary
 
     private fun appSummaryChecks(r: ScanResult): List<Check> {
         val out = ArrayList<Check>()
         val n = r.flagged.size
         out.add(Check(
-            "Aplicaciones", "Apps sospechosas",
+            "Apps", "Suspicious apps",
             if (n > 0) Sev.WARN else Sev.GOOD,
-            if (n > 0) "$n app(s) combinan señales de riesgo (sobre ${r.totalUserApps} de usuario). Revisalas una por una."
-            else "Ninguna app combina señales de riesgo (sobre ${r.totalUserApps} apps de usuario).",
-            actionLabel = if (n > 0) "Ver apps marcadas ($n)" else null,
+            if (n > 0) "$n app(s) combine risk signals (out of ${r.totalUserApps} user apps). Review them one by one."
+            else "No apps combine risk signals (out of ${r.totalUserApps} user apps).",
+            actionLabel = if (n > 0) "View flagged apps ($n)" else null,
             onAction = if (n > 0) ({ startActivity(Intent(this, AppListActivity::class.java)) }) else null
         ))
         out.add(Check(
-            "Aplicaciones", "Apps ocultas",
+            "Apps", "Hidden apps",
             when {
-                r.hiddenRisky -> Sev.WARN          // oculta + origen no confiable = patrón de spyware
-                r.hidden.isNotEmpty() -> Sev.INFO  // suelen ser componentes del sistema sin lanzador
+                r.hiddenRisky -> Sev.WARN
+                r.hidden.isNotEmpty() -> Sev.INFO
                 else -> Sev.GOOD
             },
             if (r.hidden.isNotEmpty())
-                "${r.hidden.size} app(s) de usuario sin ícono en el cajón: ${r.hidden.joinToString(", ") { it.label }}. " +
-                    "Sin ícono puede ser un componente legítimo o spyware que se esconde; revisá las que no reconozcas."
-            else "Todas las apps de usuario tienen ícono visible."
+                "${r.hidden.size} user app(s) without a launcher icon: ${r.hidden.joinToString(", ") { it.label }}. " +
+                    "No icon may be a legitimate component or hiding spyware; check the ones you don't recognize."
+            else "All user apps have a visible launcher icon."
         ))
         out.add(Check(
-            "Aplicaciones", "Servicios de accesibilidad",
+            "Apps", "Accessibility services",
             if (r.accessibility.isNotEmpty()) Sev.WARN else Sev.GOOD,
             if (r.accessibility.isNotEmpty())
-                "Apps con accesibilidad (pueden leer la pantalla y simular toques): ${r.accessibility.joinToString(", ")}."
-            else "Ninguna app de terceros usa accesibilidad.",
+                "Apps with accessibility (can read screen and simulate taps): ${r.accessibility.joinToString(", ")}."
+            else "No third-party apps use accessibility.",
             fix = if (r.accessibility.isNotEmpty()) listOf(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) else emptyList()
         ))
         out.add(Check(
-            "Aplicaciones", "Acceso a notificaciones",
+            "Apps", "Notification access",
             if (r.notifListeners.isNotEmpty()) Sev.WARN else Sev.GOOD,
             if (r.notifListeners.isNotEmpty())
-                "Apps que leen todas las notificaciones (incluidos códigos 2FA): ${r.notifListeners.joinToString(", ")}."
-            else "Ninguna app de terceros lee tus notificaciones.",
+                "Apps that read all notifications (including 2FA codes): ${r.notifListeners.joinToString(", ")}."
+            else "No third-party apps read your notifications.",
             fix = if (r.notifListeners.isNotEmpty())
                 listOf(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) else emptyList()
         ))
         out.add(Check(
-            "Aplicaciones", "Administradores de dispositivo",
+            "Apps", "Device administrators",
             if (r.deviceAdmins.isNotEmpty()) Sev.WARN else Sev.GOOD,
             if (r.deviceAdmins.isNotEmpty())
-                "Apps con admin de dispositivo (resisten desinstalación): ${r.deviceAdmins.joinToString(", ")}."
-            else "Ninguna app de terceros es administrador del dispositivo.",
+                "Apps with device admin (resist uninstall): ${r.deviceAdmins.joinToString(", ")}."
+            else "No third-party apps are device administrators.",
             fix = if (r.deviceAdmins.isNotEmpty()) listOf(Intent(Settings.ACTION_SECURITY_SETTINGS)) else emptyList()
         ))
         out.add(Check(
-            "Aplicaciones", "Apps fuera de Play Store", Sev.INFO,
-            "${r.sideloadedCount} app(s) instaladas fuera de Google Play. No es malo en sí, pero es la vía habitual del malware."
+            "Apps", "Sideloaded apps", Sev.INFO,
+            "${r.sideloadedCount} app(s) installed outside Google Play. Not inherently bad, but the usual malware route."
         ))
         return out
     }
@@ -478,7 +474,7 @@ class MainActivity : BaseSecActivity() {
             setPadding(px(18), px(22), px(18), px(28))
         }
 
-        // Encabezado
+        // Header
         contentRoot.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -495,14 +491,14 @@ class MainActivity : BaseSecActivity() {
                     setTypeface(typeface, Typeface.BOLD)
                 })
                 addView(TextView(this@MainActivity).apply {
-                    text = "Auditoría de seguridad del dispositivo"
+                    text = "Device security audit"
                     textSize = 13f
                     setTextColor(col(R.color.textSecondary))
                 })
             })
         })
 
-        // Tarjeta de puntaje
+        // Score card
         scoreNumber = TextView(this).apply {
             text = "$score"
             textSize = 44f
@@ -512,7 +508,7 @@ class MainActivity : BaseSecActivity() {
         barFilled = View(this).apply { background = rounded(scoreColor(score), px(6)) }
         barEmpty = View(this)
         scoreSub = TextView(this).apply {
-            text = "$good de $scorable controles superados"
+            text = "$good of $scorable checks passed"
             textSize = 13f
             setTextColor(col(R.color.textSecondary))
             setPadding(0, px(10), 0, 0)
@@ -539,11 +535,11 @@ class MainActivity : BaseSecActivity() {
                 addView(barEmpty, LinearLayout.LayoutParams(0, px(8), (100 - score).toFloat()))
             }, LinearLayout.LayoutParams(MATCH_PARENT, px(8)).apply { topMargin = px(12) })
             addView(scoreSub)
-            addView(makeButton("Compartir informe", filled = true) { exportReport() },
+            addView(makeButton("Share report", filled = true) { exportReport() },
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = px(14) })
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = px(18) })
 
-        // Chequeos de dispositivo (síncronos)
+        // Device checks (synchronous)
         renderChecks(allChecks)
 
         return ScrollView(this).apply {
@@ -568,7 +564,7 @@ class MainActivity : BaseSecActivity() {
         val (score, good, scorable) = computeScore()
         scoreNumber.text = "$score"
         scoreNumber.setTextColor(scoreColor(score))
-        scoreSub.text = "$good de $scorable controles superados"
+        scoreSub.text = "$good of $scorable checks passed"
         barFilled.background = rounded(scoreColor(score), px(6))
         (barFilled.layoutParams as LinearLayout.LayoutParams).weight = score.toFloat().coerceAtLeast(1f)
         (barEmpty.layoutParams as LinearLayout.LayoutParams).weight = (100 - score).toFloat()
@@ -595,7 +591,7 @@ class MainActivity : BaseSecActivity() {
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             addView(TextView(this@MainActivity).apply {
-                text = when (c.sev) { Sev.GOOD -> "OK"; Sev.WARN -> "ALERTA"; Sev.INFO -> "INFO" }
+                text = when (c.sev) { Sev.GOOD -> "OK"; Sev.WARN -> "ALERT"; Sev.INFO -> "INFO" }
                 textSize = 11f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(sevColor(c.sev))
@@ -616,7 +612,7 @@ class MainActivity : BaseSecActivity() {
                     topMargin = px(12); leftMargin = px(19)
                 })
         } else if (c.sev == Sev.WARN && c.fix.isNotEmpty()) {
-            card.addView(makeButton("Solucionar  ›", filled = false) { launchFirst(c.fix) },
+            card.addView(makeButton("Fix  ›", filled = false) { launchFirst(c.fix) },
                 LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
                     topMargin = px(10); leftMargin = px(19)
                 })
@@ -624,11 +620,11 @@ class MainActivity : BaseSecActivity() {
         return card
     }
 
-    // ------------------------------------------------------- Informe HTML
+    // ------------------------------------------------------- HTML report
 
     private fun exportReport() {
         if (!scanDone) {
-            Toast.makeText(this, "Analizando aplicaciones, probá en unos segundos…", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Scanning apps, try again in a moment…", Toast.LENGTH_SHORT).show()
             return
         }
         try {
@@ -637,9 +633,9 @@ class MainActivity : BaseSecActivity() {
             val scoreHex = if (score >= 80) "#3FB950" else "#F85149"
             val sb = StringBuilder()
             sb.append(
-                "<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'>" +
+                "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>" +
                     "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
-                    "<title>Informe SecAudit</title><style>" +
+                    "<title>SecAudit Report</title><style>" +
                     "body{margin:0;background:#0D1117;color:#E6EDF3;font-family:system-ui,Segoe UI,Roboto,sans-serif;padding:24px}" +
                     "h1{font-size:22px;margin:0}.sub{color:#8B98A5;font-size:13px;margin:4px 0 20px}" +
                     ".score{font-size:54px;font-weight:800;color:$scoreHex}.score span{font-size:18px;color:#8B98A5}" +
@@ -652,9 +648,9 @@ class MainActivity : BaseSecActivity() {
                     ".bg-good{background:rgba(63,185,80,.13)}.bg-warn{background:rgba(248,81,73,.13)}.bg-info{background:rgba(88,166,255,.13)}" +
                     "</style></head><body>"
             )
-            sb.append("<h1>🛡 SecAudit</h1><div class='sub'>Informe de seguridad · $now · ${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})</div>")
+            sb.append("<h1>🛡 SecAudit</h1><div class='sub'>Security report · $now · ${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE})</div>")
             sb.append("<div class='score'>$score<span> / 100</span></div>")
-            sb.append("<div class='sub'>$good de $scorable controles superados</div>")
+            sb.append("<div class='sub'>$good of $scorable checks passed</div>")
 
             var lastCat = ""
             for (c in allChecks) {
@@ -663,7 +659,7 @@ class MainActivity : BaseSecActivity() {
                     sb.append("<div class='cat'>${c.category.uppercase(Locale.getDefault())}</div>")
                 }
                 val cls = when (c.sev) { Sev.GOOD -> "good"; Sev.WARN -> "warn"; Sev.INFO -> "info" }
-                val label = when (c.sev) { Sev.GOOD -> "OK"; Sev.WARN -> "ALERTA"; Sev.INFO -> "INFO" }
+                val label = when (c.sev) { Sev.GOOD -> "OK"; Sev.WARN -> "ALERT"; Sev.INFO -> "INFO" }
                 sb.append(
                     "<div class='card'><div class='row'><span class='ttl'>${esc(c.title)}</span>" +
                         "<span class='chip $cls bg-$cls'>$label</span></div>" +
@@ -679,13 +675,13 @@ class MainActivity : BaseSecActivity() {
             val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
             val send = Intent(Intent.ACTION_SEND).apply {
                 type = "text/html"
-                putExtra(Intent.EXTRA_SUBJECT, "Informe SecAudit")
+                putExtra(Intent.EXTRA_SUBJECT, "SecAudit Report")
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(send, "Compartir informe"))
+            startActivity(Intent.createChooser(send, "Share report"))
         } catch (e: Exception) {
-            Toast.makeText(this, "No se pudo generar el informe: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Could not generate report: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

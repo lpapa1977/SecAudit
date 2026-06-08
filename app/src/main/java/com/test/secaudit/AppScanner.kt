@@ -9,10 +9,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 
-/** Un motivo de sospecha con su peso para el score compuesto. */
 data class Reason(val text: String, val weight: Int)
 
-/** Resultado de riesgo de una app concreta (solo apps de usuario / no-sistema). */
 data class AppRisk(
     val pkg: String,
     val label: String,
@@ -20,27 +18,24 @@ data class AppRisk(
     val reasons: List<Reason>,
     val score: Int
 ) {
-    /** ≥5 = riesgo ALTO; 3-4 = MEDIO (umbral de marcado). */
     val high: Boolean get() = score >= 5
 }
 
-/** Resultado global del escaneo, para el resumen y la pantalla de detalle. */
 data class ScanResult(
-    val flagged: List<AppRisk>,        // no-sistema, score >= 3, ordenadas desc
-    val hidden: List<AppRisk>,         // no-sistema sin ícono
-    val hiddenRisky: Boolean,          // alguna oculta es de origen no confiable
-    val accessibility: List<String>,   // labels de servicios de accesibilidad no-sistema
-    val notifListeners: List<String>,  // labels con acceso a notificaciones (no-sistema)
-    val deviceAdmins: List<String>,    // labels admins de dispositivo (no-sistema)
+    val flagged: List<AppRisk>,        // non-system, score >= 3, sorted desc
+    val hidden: List<AppRisk>,         // non-system without launcher icon
+    val hiddenRisky: Boolean,          // a hidden app is from an untrusted source
+    val accessibility: List<String>,   // labels of non-system accessibility services
+    val notifListeners: List<String>,  // labels with notification access (non-system)
+    val deviceAdmins: List<String>,    // labels of non-system device admins
     val sideloadedCount: Int,
     val totalUserApps: Int
 )
 
 /**
- * Escaneo del parque de apps con criterio compuesto, sin root. Pensado para correr en un
- * hilo de fondo. Se centra en apps **de usuario** (no-sistema). Los permisos sensibles
- * solo puntúan cuando el origen no es Google Play (combinación de señales), para no marcar
- * apps legítimas de la tienda (WhatsApp, etc.).
+ * Rootless app fleet scanner using composite signals. Runs on a background thread.
+ * Focuses on user apps (non-system). Sensitive permissions only score when the install
+ * source is not Google Play (composite signal), to avoid flagging legitimate store apps.
  */
 object AppScanner {
 
@@ -75,12 +70,12 @@ object AppScanner {
             val isSystem = (ai.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
             val label = runCatching { ai.loadLabel(pm).toString() }.getOrDefault(pkg)
 
-            // Labels para el resumen: servicios potentes en manos de apps NO-sistema.
+            // Summary labels: powerful services held by non-system apps.
             if (!isSystem && pkg in accPkgs) accLabels.add(label)
             if (!isSystem && pkg in notifPkgs) notifLabels.add(label)
             if (!isSystem && pkg in adminPkgs) adminLabels.add(label)
 
-            // El análisis de "sospechosas/ocultas" se limita a apps de usuario.
+            // Suspicious/hidden analysis limited to user apps.
             if (isSystem) continue
             userApps++
 
@@ -92,46 +87,46 @@ object AppScanner {
             val hasLauncher = pm.getLaunchIntentForPackage(pkg) != null ||
                 pm.getLeanbackLaunchIntentForPackage(pkg) != null
             val isHidden = !hasLauncher
-            if (isHidden) reasons.add(Reason("Sin ícono en el cajón de apps (oculta)", 2))
+            if (isHidden) reasons.add(Reason("No launcher icon (hidden app)", 2))
 
-            if (pkg in accPkgs) reasons.add(Reason("Servicio de accesibilidad activo: puede leer la pantalla y simular toques", 3))
-            if (pkg in adminPkgs) reasons.add(Reason("Administrador de dispositivo: dificulta su desinstalación", 3))
-            if (pkg in notifPkgs) reasons.add(Reason("Lee todas las notificaciones (incluye códigos 2FA)", 3))
+            if (pkg in accPkgs) reasons.add(Reason("Active accessibility service: can read screen and simulate taps", 3))
+            if (pkg in adminPkgs) reasons.add(Reason("Device administrator: resists uninstall", 3))
+            if (pkg in notifPkgs) reasons.add(Reason("Reads all notifications (including 2FA codes)", 3))
 
             val granted = grantedPermissions(pi)
             val uid = ai.uid
 
             if ("android.permission.SYSTEM_ALERT_WINDOW" in granted &&
                 appOpAllowed(ops, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW, uid, pkg)
-            ) reasons.add(Reason("Puede dibujar sobre otras apps (overlays)", 2))
+            ) reasons.add(Reason("Can draw over other apps (overlays)", 2))
 
             if ("android.permission.REQUEST_INSTALL_PACKAGES" in granted)
-                reasons.add(Reason("Puede instalar otras apps", 2))
+                reasons.add(Reason("Can install other apps", 2))
 
             if (appOpAllowed(ops, AppOpsManager.OPSTR_GET_USAGE_STATS, uid, pkg))
-                reasons.add(Reason("Acceso a estadísticas de uso de apps", 1))
+                reasons.add(Reason("Access to app usage statistics", 1))
 
             if (ai.targetSdkVersion < Build.VERSION_CODES.M)
-                reasons.add(Reason("Apunta a una API muy vieja (targetSdk ${ai.targetSdkVersion}): evade permisos modernos", 2))
+                reasons.add(Reason("Targets a very old API (targetSdk ${ai.targetSdkVersion}): bypasses modern permissions", 2))
 
             if ((ai.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
-                reasons.add(Reason("Compilada en modo depuración", 1))
+                reasons.add(Reason("Compiled in debug mode", 1))
 
-            if (sideloaded) reasons.add(Reason("Instalada fuera de Google Play", 1))
+            if (sideloaded) reasons.add(Reason("Installed outside Google Play", 1))
 
-            // Permisos sensibles: solo puntúan si el origen NO es Play (señal compuesta).
+            // Sensitive permissions only score if origin is NOT Play (composite signal).
             val danger = listOf(
-                "android.permission.READ_SMS" to "leer SMS",
-                "android.permission.SEND_SMS" to "enviar SMS",
-                "android.permission.READ_CALL_LOG" to "registro de llamadas",
-                "android.permission.RECORD_AUDIO" to "micrófono",
-                "android.permission.CAMERA" to "cámara",
-                "android.permission.READ_CONTACTS" to "contactos",
-                "android.permission.ACCESS_BACKGROUND_LOCATION" to "ubicación en 2.º plano"
+                "android.permission.READ_SMS" to "read SMS",
+                "android.permission.SEND_SMS" to "send SMS",
+                "android.permission.READ_CALL_LOG" to "call log",
+                "android.permission.RECORD_AUDIO" to "microphone",
+                "android.permission.CAMERA" to "camera",
+                "android.permission.READ_CONTACTS" to "contacts",
+                "android.permission.ACCESS_BACKGROUND_LOCATION" to "background location"
             ).filter { it.first in granted }
             if (danger.isNotEmpty() && sideloaded) {
                 reasons.add(Reason(
-                    "Permisos sensibles: " + danger.joinToString(", ") { it.second },
+                    "Sensitive permissions: " + danger.joinToString(", ") { it.second },
                     danger.size.coerceAtMost(3)
                 ))
             }
@@ -187,7 +182,7 @@ object AppScanner {
         } catch (_: Exception) { false }
     }
 
-    /** Parsea una lista de componentes ("pkg/.Servicio:pkg2/...") a un set de paquetes. */
+    /** Parses a component list ("pkg/.Service:pkg2/...") into a set of package names. */
     private fun enabledServicePkgs(ctx: Context, secureKey: String): Set<String> {
         val raw = try { Settings.Secure.getString(ctx.contentResolver, secureKey) } catch (_: Exception) { null }
             ?: return emptySet()

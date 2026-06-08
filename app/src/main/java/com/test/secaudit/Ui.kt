@@ -9,12 +9,11 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
-/** Severidad compartida por los chequeos de dispositivo y el análisis de apps. */
 enum class Sev { GOOD, WARN, INFO }
 
 /**
- * Base con los helpers de UI (estilo dark, sin XML) reutilizados por MainActivity y
- * AppListActivity: conversión dp→px, colores, fondos redondeados y botones.
+ * Base with UI helpers (dark style, no XML) reused by MainActivity and AppListActivity:
+ * dp→px conversion, colors, rounded backgrounds and buttons.
  */
 abstract class BaseSecActivity : AppCompatActivity() {
 
@@ -36,7 +35,7 @@ abstract class BaseSecActivity : AppCompatActivity() {
             if (strokeW > 0) setStroke(strokeW, strokeColor)
         }
 
-    /** Botón estilizado (sin XML): relleno acento o contorno. */
+    /** Styled button (no XML): filled accent or outline. */
     protected fun makeButton(label: String, filled: Boolean, onClick: () -> Unit): View =
         TextView(this).apply {
             text = label
@@ -55,10 +54,10 @@ abstract class BaseSecActivity : AppCompatActivity() {
             setOnClickListener { onClick() }
         }
 
-    /** Lanza el primer intent que abra; si ninguno, Ajustes general. */
+    /** Launches the first intent that resolves; falls back to general Settings. */
     protected fun launchFirst(candidates: List<android.content.Intent>) {
         for (i in candidates) {
-            try { startActivity(i); return } catch (_: Exception) { /* siguiente */ }
+            try { startActivity(i); return } catch (_: Exception) { /* try next */ }
         }
         try { startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) } catch (_: Exception) {}
     }
